@@ -19,6 +19,7 @@ import { CheckoutButtonInitializeOptions } from '../checkout-button-options';
 
 import { BraintreePaypalButtonInitializeOptions } from './braintree-paypal-button-options';
 import BraintreePaypalButtonStrategy from './braintree-paypal-button-strategy';
+import { CheckoutButtonMethod } from './checkout-button-method';
 
 describe('BraintreePaypalButtonStrategy', () => {
     let braintreeSDKCreator: BraintreeSDKCreator;
@@ -51,7 +52,7 @@ describe('BraintreePaypalButtonStrategy', () => {
         };
 
         options = {
-            methodId: 'braintreepaypal',
+            methodId: CheckoutButtonMethod.BRAINTREE_PAYPAL,
             braintreepaypal: paypalOptions,
         };
 
@@ -390,7 +391,7 @@ describe('BraintreePaypalButtonStrategy', () => {
         jest.spyOn(braintreeSDKCreator, 'teardown');
 
         await strategy.initialize(options);
-        await strategy.deinitialize({ methodId: 'braintreepaypal' });
+        await strategy.deinitialize({ methodId: CheckoutButtonMethod.BRAINTREE_PAYPAL });
 
         expect(braintreeSDKCreator.teardown).toHaveBeenCalled();
     });
@@ -398,7 +399,7 @@ describe('BraintreePaypalButtonStrategy', () => {
     describe('if PayPal Credit is offered', () => {
         beforeEach(() => {
             options = {
-                methodId: 'braintreepaypalcredit',
+                methodId: CheckoutButtonMethod.BRAINTREE_PAYPAL_CREDIT,
                 braintreepaypalcredit: {
                     container: 'checkout-button',
                 },

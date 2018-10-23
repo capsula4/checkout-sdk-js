@@ -2,6 +2,7 @@ import { InternalCheckoutSelectors } from '../checkout';
 import { selector } from '../common/selector';
 
 import CheckoutButtonSelector from './checkout-button-selector';
+import { CheckoutButtonMethod } from './strategies';
 
 @selector
 export default class CheckoutButtonStatusSelector {
@@ -14,11 +15,11 @@ export default class CheckoutButtonStatusSelector {
         this._checkoutButton = selectors.checkoutButton;
     }
 
-    isInitializingButton(methodId?: string): boolean {
+    isInitializingButton(methodId?: CheckoutButtonMethod): boolean {
         return this._checkoutButton.isInitializing(methodId);
     }
 
-    isDeinitializingButton(methodId?: string): boolean {
+    isDeinitializingButton(methodId?: CheckoutButtonMethod): boolean {
         return this._checkoutButton.isDeinitializing(methodId);
     }
 }
