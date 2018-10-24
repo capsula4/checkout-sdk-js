@@ -7,14 +7,14 @@ import { PaymentMethodActionCreator, PaymentMethodActionType, PaymentMethodReque
 import { getPaymentMethod } from '../payment/payment-methods.mock';
 
 import { CheckoutButtonActionType } from './checkout-button-actions';
-import { CheckoutButtonOptions } from './checkout-button-options';
+import { CheckoutButtonInitializeOptions } from './checkout-button-options';
 import CheckoutButtonStrategyActionCreator from './checkout-button-strategy-action-creator';
 import { CheckoutButtonMethod, CheckoutButtonStrategy } from './strategies';
 
 describe('CheckoutButtonStrategyActionCreator', () => {
     let paymentMethodActionCreator: PaymentMethodActionCreator;
     let registry: Registry<CheckoutButtonStrategy>;
-    let options: CheckoutButtonOptions;
+    let options: CheckoutButtonInitializeOptions;
     let strategyActionCreator: CheckoutButtonStrategyActionCreator;
     let strategy: CheckoutButtonStrategy;
 
@@ -33,7 +33,10 @@ describe('CheckoutButtonStrategyActionCreator', () => {
                 createAction(PaymentMethodActionType.LoadPaymentMethodSucceeded, { paymentMethod: getPaymentMethod() }),
             ]));
 
-        options = { methodId: CheckoutButtonMethod.BRAINTREE_PAYPAL };
+        options = {
+            methodId: CheckoutButtonMethod.BRAINTREE_PAYPAL,
+            containerId: 'checkout-button',
+        };
 
         strategyActionCreator = new CheckoutButtonStrategyActionCreator(
             registry,
@@ -64,7 +67,8 @@ describe('CheckoutButtonStrategyActionCreator', () => {
 
     it('emits actions indicating initialization progress', async () => {
         const methodId = CheckoutButtonMethod.BRAINTREE_PAYPAL;
-        const actions = await strategyActionCreator.initialize({ methodId })
+        const containerId = 'checkout-button';
+        const actions = await strategyActionCreator.initialize({ methodId, containerId })
             .toArray()
             .toPromise();
 
@@ -78,13 +82,14 @@ describe('CheckoutButtonStrategyActionCreator', () => {
 
     it('throws error if unable to load required payment method', async () => {
         const methodId = CheckoutButtonMethod.BRAINTREE_PAYPAL;
+        const containerId = 'checkout-button';
         const expectedError = new Error('Unable to load payment method');
 
         jest.spyOn(paymentMethodActionCreator, 'loadPaymentMethod')
             .mockReturnValue(Observable.throw(createErrorAction(PaymentMethodActionType.LoadPaymentMethodFailed, expectedError)));
 
         const errorHandler = jest.fn(action => Observable.of(action));
-        const actions = await strategyActionCreator.initialize({ methodId })
+        const actions = await strategyActionCreator.initialize({ methodId, containerId })
             .catch(errorHandler)
             .toArray()
             .toPromise();
@@ -99,13 +104,14 @@ describe('CheckoutButtonStrategyActionCreator', () => {
 
     it('throws error if unable to initialize strategy', async () => {
         const methodId = CheckoutButtonMethod.BRAINTREE_PAYPAL;
+        const containerId = 'checkout-button';
         const expectedError = new Error('Unable to initialize strategy');
 
         jest.spyOn(strategy, 'initialize')
             .mockReturnValue(Promise.reject(expectedError));
 
         const errorHandler = jest.fn(action => Observable.of(action));
-        const actions = await strategyActionCreator.initialize({ methodId })
+        const actions = await strategyActionCreator.initialize({ methodId, containerId })
             .catch(errorHandler)
             .toArray()
             .toPromise();

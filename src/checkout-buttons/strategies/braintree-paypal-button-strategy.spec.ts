@@ -46,13 +46,13 @@ describe('BraintreePaypalButtonStrategy', () => {
         paypalScriptLoader = new PaypalScriptLoader(getScriptLoader());
 
         paypalOptions = {
-            container: 'checkout-button',
             onAuthorizeError: jest.fn(),
             onPaymentError: jest.fn(),
         };
 
         options = {
             methodId: CheckoutButtonMethod.BRAINTREE_PAYPAL,
+            containerId: 'checkout-button',
             braintreepaypal: paypalOptions,
         };
 
@@ -149,6 +149,22 @@ describe('BraintreePaypalButtonStrategy', () => {
                 shape: 'rect',
             },
         }, 'checkout-button');
+    });
+
+    it('renders PayPal checkout button once when same containerId is passed', async () => {
+        await strategy.initialize(options);
+        await strategy.initialize(options);
+
+        expect(paypal.Button.render).toHaveBeenCalledTimes(1);
+    });
+
+    it('renders PayPal checkout button once per containerId', async () => {
+        await strategy.initialize(options);
+        await strategy.initialize({ ...options, containerId: 'foo' });
+        await strategy.initialize(options);
+        await strategy.initialize({ ...options, containerId: 'foo' });
+
+        expect(paypal.Button.render).toHaveBeenCalledTimes(2);
     });
 
     it('customizes style of PayPal checkout button', async () => {
@@ -400,9 +416,7 @@ describe('BraintreePaypalButtonStrategy', () => {
         beforeEach(() => {
             options = {
                 methodId: CheckoutButtonMethod.BRAINTREE_PAYPAL_CREDIT,
-                braintreepaypalcredit: {
-                    container: 'checkout-button',
-                },
+                containerId: 'checkout-button',
             };
 
             strategy = new BraintreePaypalButtonStrategy(

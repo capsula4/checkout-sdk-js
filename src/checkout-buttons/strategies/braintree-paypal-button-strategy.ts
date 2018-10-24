@@ -3,7 +3,7 @@ import { pick } from 'lodash';
 
 import { Address, LegacyAddress } from '../../address';
 import { CheckoutActionCreator, CheckoutStore } from '../../checkout';
-import { InvalidArgumentError, MissingDataError, MissingDataErrorType, NotInitializedError, NotInitializedErrorType, StandardError } from '../../common/error/errors';
+import { MissingDataError, MissingDataErrorType, NotInitializedError, NotInitializedErrorType, StandardError } from '../../common/error/errors';
 import { PaymentMethod } from '../../payment';
 import { BraintreeAddress, BraintreeError, BraintreePaypalCheckout, BraintreeSDKCreator, BraintreeTokenizePayload } from '../../payment/strategies/braintree';
 import { PaypalAuthorizeData, PaypalScriptLoader } from '../../payment/strategies/paypal';
@@ -27,17 +27,13 @@ export default class BraintreePaypalButtonStrategy extends CheckoutButtonStrateg
     }
 
     initialize(options: CheckoutButtonInitializeOptions): Promise<void> {
-        if (this._isInitialized) {
+        if (this._isInitialized[options.containerId]) {
             return super.initialize(options);
         }
 
-        const paypalOptions = this._offerCredit ? options.braintreepaypalcredit : options.braintreepaypal;
+        const paypalOptions = (this._offerCredit ? options.braintreepaypalcredit : options.braintreepaypal) || {};
         const state = this._store.getState();
         const paymentMethod = this._paymentMethod = state.paymentMethods.getPaymentMethod(options.methodId);
-
-        if (!paypalOptions) {
-            throw new InvalidArgumentError();
-        }
 
         if (!paymentMethod || !paymentMethod.clientToken) {
             throw new MissingDataError(MissingDataErrorType.MissingPaymentMethod);
@@ -62,13 +58,13 @@ export default class BraintreePaypalButtonStrategy extends CheckoutButtonStrateg
                     },
                     payment: () => this._setupPayment(paypalOptions.onPaymentError),
                     onAuthorize: data => this._tokenizePayment(data, paypalOptions.shouldProcessPayment, paypalOptions.onAuthorizeError),
-                }, paypalOptions.container);
+                }, options.containerId);
             })
             .then(() => super.initialize(options));
     }
 
     deinitialize(options: CheckoutButtonOptions): Promise<void> {
-        if (!this._isInitialized) {
+        if (!Object.keys(this._isInitialized).length) {
             return super.deinitialize(options);
         }
 

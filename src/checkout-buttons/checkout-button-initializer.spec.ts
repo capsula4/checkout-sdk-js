@@ -38,7 +38,10 @@ describe('CheckoutButtonInitializer', () => {
     });
 
     it('dispatches action to initialize button strategy', async () => {
-        const options = { methodId: CheckoutButtonMethod.BRAINTREE_PAYPAL };
+        const options = {
+            methodId: CheckoutButtonMethod.BRAINTREE_PAYPAL,
+            containerId: 'checkout-button',
+        };
 
         await initializer.initializeButton(options);
 
@@ -50,7 +53,10 @@ describe('CheckoutButtonInitializer', () => {
     });
 
     it('dispatches action to deinitialize button strategy', async () => {
-        const options = { methodId: CheckoutButtonMethod.BRAINTREE_PAYPAL };
+        const options = {
+            methodId: CheckoutButtonMethod.BRAINTREE_PAYPAL,
+            containerId: 'checkout-button',
+        };
 
         await initializer.deinitializeButton(options);
 
