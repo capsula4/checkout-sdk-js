@@ -2681,6 +2681,7 @@ declare interface NonceGenerationError {
 declare interface Order {
     baseAmount: number;
     billingAddress: BillingAddress;
+    shippingAddresses: Address[];
     cartId: string;
     coupons: Coupon[];
     currency: Currency;

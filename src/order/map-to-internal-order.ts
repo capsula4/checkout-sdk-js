@@ -41,6 +41,7 @@ export default function mapToInternalOrder(order: Order, orderMeta: OrderMetaSta
             integerAmount: amountTransformer.toInteger(order.discountAmount),
         },
         billingAddress: order.billingAddress,
+        shippingAddresses: order.shippingAddresses,
         token: orderMeta.orderToken,
         callbackUrl: orderMeta.callbackUrl,
         discountNotifications: [],

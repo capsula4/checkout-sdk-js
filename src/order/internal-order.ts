@@ -1,3 +1,4 @@
+import { Address } from '../address';
 import { BillingAddress } from '../billing';
 import { InternalLineItem } from '../cart';
 import { InternalCoupon, InternalGiftCertificate } from '../coupon';
@@ -10,6 +11,7 @@ export default interface InternalOrder {
     currency: string;
     customerCanBeCreated: boolean;
     billingAddress: BillingAddress;
+    shippingAddresses: Address[];
     subtotal: {
         amount: number;
         integerAmount: number;

@@ -358,6 +358,7 @@ declare interface InternalOrder {
     currency: string;
     customerCanBeCreated: boolean;
     billingAddress: BillingAddress;
+    shippingAddresses: Address[];
     subtotal: {
         amount: number;
         integerAmount: number;
@@ -506,6 +507,7 @@ declare interface LineItemSocialData {
 declare interface Order {
     baseAmount: number;
     billingAddress: BillingAddress;
+    shippingAddresses: Address[];
     cartId: string;
     coupons: Coupon[];
     currency: Currency;

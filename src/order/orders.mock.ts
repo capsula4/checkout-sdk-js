@@ -2,6 +2,7 @@ import { getBillingAddress } from '../billing/billing-addresses.mock';
 import { getGiftCertificateItem } from '../cart/line-items.mock';
 import { getCoupon, getShippingCoupon } from '../coupon/coupons.mock';
 import { getCurrency } from '../currency/currencies.mock';
+import { getShippingAddress } from '../shipping/shipping-addresses.mock';
 
 import { getAwaitingOrder, getSubmitOrderResponseHeaders } from './internal-orders.mock';
 import { getPhysicalItem } from './line-items.mock';
@@ -16,6 +17,9 @@ export function getOrder(): Order {
         coupons: [
             getCoupon(),
             getShippingCoupon(),
+        ],
+        shippingAddresses: [
+            getShippingAddress(),
         ],
         currency: getCurrency(),
         customerMessage: '',
