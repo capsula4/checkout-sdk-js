@@ -1,3 +1,4 @@
+import { BillingAddress } from '../billing';
 import { InternalLineItem } from '../cart';
 import { InternalCoupon, InternalGiftCertificate } from '../coupon';
 import { DiscountNotification } from '../discount';
@@ -8,6 +9,7 @@ export default interface InternalOrder {
     items: InternalLineItem[];
     currency: string;
     customerCanBeCreated: boolean;
+    billingAddress: BillingAddress;
     subtotal: {
         amount: number;
         integerAmount: number;

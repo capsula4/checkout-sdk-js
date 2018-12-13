@@ -1,3 +1,4 @@
+import { getBillingAddress } from '../billing/billing-addresses.mock';
 import { getGuestCustomer } from '../customer/internal-customers.mock';
 import { getPayment } from '../payment/payments.mock';
 
@@ -66,6 +67,7 @@ export function getCompleteOrder(): InternalOrder {
     return {
         ...getIncompleteOrder(),
         id: 295,
+        billingAddress: getBillingAddress(),
         items: [
             {
                 id: 103,
