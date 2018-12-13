@@ -357,6 +357,7 @@ declare interface InternalOrder {
     items: InternalLineItem[];
     currency: string;
     customerCanBeCreated: boolean;
+    billingAddress: BillingAddress;
     subtotal: {
         amount: number;
         integerAmount: number;
