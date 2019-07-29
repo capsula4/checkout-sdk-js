@@ -11,7 +11,7 @@ import CheckoutState, { DEFAULT_STATE } from './checkout-state';
 
 export default interface CheckoutSelector {
     getCheckout(): Checkout | undefined;
-    getGrandTotal(useStoreCredit?: boolean): number | undefined;
+    getOutstandingBalance(useStoreCredit?: boolean): number | undefined;
     getLoadError(): Error | undefined;
     isLoading(): boolean;
     getUpdateError(): Error | undefined;
@@ -70,7 +70,7 @@ export function createCheckoutSelectorFactory(): CheckoutSelectorFactory {
         }
     );
 
-    const getGrandTotal = createSelector(
+    const getOutstandingBalance = createSelector(
         getCheckout,
         getCheckout => (useStoreCredit?: boolean) => {
             const checkout = getCheckout();
@@ -82,7 +82,7 @@ export function createCheckoutSelectorFactory(): CheckoutSelectorFactory {
             const grandTotal = checkout.grandTotal || 0;
             const storeCredit = checkout.customer.storeCredit || 0;
 
-            return useStoreCredit ? Math.max(grandTotal - storeCredit, 0) : grandTotal;
+            return useStoreCredit ? Math.max(grandTotal - storeCredit, 0) : checkout.outstandingBalance;
         }
     );
 
@@ -124,7 +124,7 @@ export function createCheckoutSelectorFactory(): CheckoutSelectorFactory {
                 customer,
                 giftCertificates,
             }),
-            getGrandTotal: getGrandTotal(state, {
+            getOutstandingBalance: getOutstandingBalance(state, {
                 billingAddress,
                 cart,
                 consignments,
