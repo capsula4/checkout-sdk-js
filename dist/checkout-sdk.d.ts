@@ -363,6 +363,7 @@ declare interface Checkout {
     consignments: Consignment[];
     taxes: Tax[];
     discounts: Discount[];
+    isStoreCreditApplied: boolean;
     coupons: Coupon[];
     orderId?: number;
     shippingCostTotal: number;
@@ -371,6 +372,7 @@ declare interface Checkout {
     taxTotal: number;
     subtotal: number;
     grandTotal: number;
+    outstandingBalance: number;
     giftCertificates: GiftCertificate[];
     promotions?: Promotion[];
     balanceDue: number;
@@ -590,6 +592,7 @@ declare class CheckoutService {
     private _shippingCountryActionCreator;
     private _shippingStrategyActionCreator;
     private _spamProtectionActionCreator;
+    private _storeCreditActionCreator;
     private _storeProjection;
     private _errorTransformer;
     private _selectorsFactory;
@@ -1238,6 +1241,21 @@ declare class CheckoutService {
      */
     updateBillingAddress(address: Partial<BillingAddressRequestBody>, options?: RequestOptions): Promise<CheckoutSelectors>;
     /**
+     * Applies or removes customer's store credit code to the current checkout.
+     *
+     * Once the store credit gets applied, the outstanding balance will be adjusted accordingly.
+     *
+     * ```js
+     * const state = await service.applyStoreCredit(true);
+     *
+     * console.log(state.data.getCheckout().outstandingBalance);
+     * ```
+     *
+     * @param options - Options for applying store credit.
+     * @returns A promise that resolves to the current state.
+     */
+    applyStoreCredit(useStoreCredit: boolean, options?: RequestOptions): Promise<CheckoutSelectors>;
+    /**
      * Applies a coupon code to the current checkout.
      *
      * Once the coupon code gets applied, the quote for the current checkout will
@@ -1569,6 +1587,12 @@ declare interface CheckoutStoreErrorSelector {
      * @returns The error object if unable to initialize, otherwise undefined.
      */
     getInitializeShippingError(methodId?: string): Error | undefined;
+    /**
+     * Returns an error if unable to apply store credit.
+     *
+     * @returns The error object if unable to apply, otherwise undefined.
+     */
+    getApplyStoreCreditError(): RequestError | undefined;
     /**
      * Returns an error if unable to apply a coupon code.
      *
@@ -2004,6 +2028,12 @@ declare interface CheckoutStoreStatusSelector {
      * @returns True if applying a coupon code, otherwise false.
      */
     isApplyingCoupon(): boolean;
+    /**
+     * Checks whether the current customer is applying store credit.
+     *
+     * @returns True if applying store credit, otherwise false.
+     */
+    isApplyingStoreCredit(): boolean;
     /**
      * Checks whether the current customer is removing a coupon code.
      *
@@ -2790,7 +2820,7 @@ declare interface OrderRequestBody {
      * An object that contains the payment details of a customer. In some cases,
      * you can omit this object if the order does not require further payment.
      * For example, the customer is able to use their store credit to pay for
-     * the entire order. Or they have already submitted thier payment details
+     * the entire order. Or they have already submitted their payment details
      * using PayPal.
      */
     payment?: OrderPaymentRequestBody;
