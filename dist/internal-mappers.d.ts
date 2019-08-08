@@ -76,6 +76,7 @@ declare interface Checkout {
     consignments: Consignment[];
     taxes: Tax[];
     discounts: Discount[];
+    isStoreCreditApplied: boolean;
     coupons: Coupon[];
     orderId?: number;
     shippingCostTotal: number;
@@ -84,6 +85,7 @@ declare interface Checkout {
     taxTotal: number;
     subtotal: number;
     grandTotal: number;
+    outstandingBalance: number;
     giftCertificates: GiftCertificate[];
     promotions?: Promotion[];
     balanceDue: number;
