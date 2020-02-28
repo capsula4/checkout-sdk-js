@@ -12,22 +12,22 @@ import PaymentActionCreator from '../../payment-action-creator';
 import { PaymentInitializeOptions, PaymentRequestOptions } from '../../payment-request-options';
 import PaymentStrategy from '../payment-strategy';
 
-import { ActionType, AdditionalAction, AdditionalActionState, AdyenAction, AdyenCheckout, AdyenComponent, AdyenConfiguration, AdyenError, ComponentState, ComponentType } from './adyenv2';
+import { AdyenAction, AdyenActionType, AdyenAdditionalAction, AdyenAdditionalActionState, AdyenCheckout, AdyenComponent, AdyenComponentState, AdyenComponentType, AdyenConfiguration, AdyenError } from './adyenv2';
 import AdyenV2PaymentInitializeOptions from './adyenv2-initialize-options';
 import AdyenV2ScriptLoader from './adyenv2-script-loader';
 
 export default class AdyenV2PaymentStrategy implements PaymentStrategy {
     private _adyenCheckout?: AdyenCheckout;
     private _adyenv2?: AdyenV2PaymentInitializeOptions;
-    private _adyenPaymentComponent?: AdyenComponent;
-    private _adyenCardVerificationComponent?: AdyenComponent;
-    private _componentState?: ComponentState;
+    private _paymentComponent?: AdyenComponent;
+    private _cardVerificationComponent?: AdyenComponent;
+    private _componentState?: AdyenComponentState;
 
     constructor(
         private _store: CheckoutStore,
         private _paymentActionCreator: PaymentActionCreator,
         private _orderActionCreator: OrderActionCreator,
-        private _adyenV2ScriptLoader: AdyenV2ScriptLoader,
+        private _scriptLoader: AdyenV2ScriptLoader,
         private _locale: string
     ) {}
 
@@ -53,7 +53,7 @@ export default class AdyenV2PaymentStrategy implements PaymentStrategy {
             paymentMethodsResponse: paymentMethod.initializationData.paymentMethodsResponse,
         };
 
-        return this._adyenV2ScriptLoader.load(configuration)
+        return this._scriptLoader.load(configuration)
             .then(adyenCheckout => {
                 this._adyenCheckout = adyenCheckout;
 
@@ -61,7 +61,7 @@ export default class AdyenV2PaymentStrategy implements PaymentStrategy {
                     paymentMethod.method,
                     {
                         ...adyenv2.options,
-                        onChange: (componentState: ComponentState) => {
+                        onChange: (componentState: AdyenComponentState) => {
                             this._updateComponentState(componentState);
                         },
                     }
@@ -69,18 +69,21 @@ export default class AdyenV2PaymentStrategy implements PaymentStrategy {
 
                 paymentComponent.mount(`#${adyenv2.containerId}`);
 
-                this._adyenPaymentComponent = paymentComponent;
+                this._paymentComponent = paymentComponent;
 
                 if (adyenv2.cardVerificationContainerId) {
-                    const cardVerificationComponent = this._adyenCheckout.create(ComponentType.SecuredFields, {
-                        onChange: (componentState: ComponentState) => {
+                    const cardVerificationComponent = this._adyenCheckout.create(AdyenComponentType.SecuredFields, {
+                        onChange: (componentState: AdyenComponentState) => {
+                            this._updateComponentState(componentState);
+                        },
+                        onError: (componentState: AdyenComponentState) => {
                             this._updateComponentState(componentState);
                         },
                     });
 
                     cardVerificationComponent.mount(`#${adyenv2.cardVerificationContainerId}`);
 
-                    this._adyenCardVerificationComponent = cardVerificationComponent;
+                    this._cardVerificationComponent = cardVerificationComponent;
                 }
 
                 return Promise.resolve(this._store.getState());
@@ -140,39 +143,8 @@ export default class AdyenV2PaymentStrategy implements PaymentStrategy {
 
                 return this._store.dispatch(this._paymentActionCreator.submitPayment(paymentPayload));
             })
-            .catch(error => {
-                if (!(error instanceof RequestError) || !some(error.body.errors, { code: 'additional_action_required' })) {
-                    return Promise.reject(error);
-                }
-
-                return this._handleFromAction(error.body.provider_data)
-                    .then((payment: Payment) =>
-                        this._store.dispatch(this._paymentActionCreator.submitPayment({
-                            ...payment,
-                            paymentData: {
-                                ...payment.paymentData,
-                                shouldSaveInstrument,
-                            },
-                        }))
-                    )
-                    .catch(error => {
-                        if (!(error instanceof RequestError) || !some(error.body.errors, { code: 'additional_action_required' })) {
-                            return Promise.reject(error);
-                        }
-
-                        return this._handleFromAction(error.body.provider_data)
-                            .then((payment: Payment) =>
-                                this._store.dispatch(this._paymentActionCreator.submitPayment({
-                                    ...payment,
-                                    paymentData: {
-                                        ...payment.paymentData,
-                                        shouldSaveInstrument,
-                                    },
-                                }))
-                            );
-                        }
-                    );
-            });
+            .catch(error => this._processPayment(error, shouldSaveInstrument))
+            .catch(error => this._processPayment(error, shouldSaveInstrument));
     }
 
     finalize(): Promise<InternalCheckoutSelectors> {
@@ -180,14 +152,14 @@ export default class AdyenV2PaymentStrategy implements PaymentStrategy {
     }
 
     deinitialize(): Promise<InternalCheckoutSelectors> {
-        if (this._adyenPaymentComponent) {
-            this._adyenPaymentComponent.unmount();
-            this._adyenPaymentComponent = undefined;
+        if (this._paymentComponent) {
+            this._paymentComponent.unmount();
+            this._paymentComponent = undefined;
         }
 
-        if (this._adyenCardVerificationComponent) {
-            this._adyenCardVerificationComponent.unmount();
-            this._adyenCardVerificationComponent = undefined;
+        if (this._cardVerificationComponent) {
+            this._cardVerificationComponent.unmount();
+            this._cardVerificationComponent = undefined;
         }
 
         return Promise.resolve(this._store.getState());
@@ -211,7 +183,23 @@ export default class AdyenV2PaymentStrategy implements PaymentStrategy {
         return widgetSize;
     }
 
-    private _handleFromAction(additionalAction: AdditionalAction): Promise<Payment> {
+    private async _processPayment(error: any, shouldSaveInstrument?: boolean): Promise<any> {
+        if (!(error instanceof RequestError) || !some(error.body.errors, { code: 'additional_action_required' })) {
+            return Promise.reject(error);
+        }
+
+        const payment = await this._handleFromAction(error.body.provider_data);
+
+        return await this._store.dispatch(this._paymentActionCreator.submitPayment({
+            ...payment,
+            paymentData: {
+                ...payment.paymentData,
+                shouldSaveInstrument,
+            },
+        }));
+    }
+
+    private _handleFromAction(additionalAction: AdyenAdditionalAction): Promise<Payment> {
         return new Promise((resolve, reject) => {
             if (!this._adyenCheckout) {
                 throw new NotInitializedError(NotInitializedErrorType.PaymentNotInitialized);
@@ -222,7 +210,7 @@ export default class AdyenV2PaymentStrategy implements PaymentStrategy {
             const adyenAction: AdyenAction = JSON.parse(additionalAction.action);
 
             const additionalActionComponent = this._adyenCheckout.createFromAction(adyenAction, {
-                onAdditionalDetails: (additionalActionState: AdditionalActionState) => {
+                onAdditionalDetails: (additionalActionState: AdyenAdditionalActionState) => {
                     const paymentPayload = {
                         methodId: adyenAction.paymentMethodType,
                         paymentData: {
@@ -241,21 +229,21 @@ export default class AdyenV2PaymentStrategy implements PaymentStrategy {
             });
 
             if (onBeforeLoad) {
-                onBeforeLoad(adyenAction.type === ActionType.ThreeDS2Challenge);
+                onBeforeLoad(adyenAction.type === AdyenActionType.ThreeDS2Challenge);
             }
 
             additionalActionComponent.mount(`#${containerId || threeDS2ContainerId}`);
 
             if (onLoad) {
                 onLoad(() => {
-                    reject();
+                    reject('Close button clicked');
                     additionalActionComponent.unmount();
                 });
             }
         });
     }
 
-    private _updateComponentState(componentState: ComponentState) {
+    private _updateComponentState(componentState: AdyenComponentState) {
         this._componentState = componentState;
     }
 }

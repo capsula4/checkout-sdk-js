@@ -17,9 +17,9 @@ import { getAdyenV2 } from '../../payment-methods.mock';
 import PaymentRequestSender from '../../payment-request-sender';
 import PaymentRequestTransformer from '../../payment-request-transformer';
 
-import { AdditionalActionState, AdyenError, AdyenV2PaymentStrategy, AdyenV2ScriptLoader, ComponentState, ResultCode } from '.';
+import { AdyenAdditionalActionState, AdyenComponentState, AdyenError, AdyenV2PaymentStrategy, AdyenV2ScriptLoader, ResultCode } from '.';
 import { AdyenCheckout, AdyenComponent } from './adyenv2';
-import { getAdditionalActionError, getAdyenCheckout, getAdyenError, getInitializeOptions, getInitializeOptionsWithNoCallbacks, getInitializeOptionsWithUndefinedWidgetSize, getOrderRequestBody, getOrderRequestBodyWithoutPayment, getOrderRequestBodyWithVaultedInstrument, getUnknownError, getValidCardState } from './adyenv2.mock';
+import { getAdditionalActionError, getAdyenCheckout, getAdyenError, getCardState, getInitializeOptions, getInitializeOptionsWithNoCallbacks, getInitializeOptionsWithUndefinedWidgetSize, getOrderRequestBody, getOrderRequestBodyWithoutPayment, getOrderRequestBodyWithVaultedInstrument, getUnknownError } from './adyenv2.mock';
 
 describe('AdyenV2PaymentStrategy', () => {
     let finalizeOrderAction: Observable<FinalizeOrderAction>;
@@ -123,14 +123,15 @@ describe('AdyenV2PaymentStrategy', () => {
         let additionalActionComponent: AdyenComponent;
 
         beforeEach(() => {
-            let handleOnChange: (componentState: ComponentState) => {};
-            let handleOnAdditionalDetails: (additionalActionState: AdditionalActionState) => {};
+            let handleOnChange: (componentState: AdyenComponentState) => {};
+            let handleOnError: (componentState: AdyenComponentState) => {};
+            let handleOnAdditionalDetails: (additionalActionState: AdyenAdditionalActionState) => {};
 
             options = getInitializeOptions();
 
             adyenPaymentComponent = {
                 mount: jest.fn(() => {
-                    handleOnChange(getValidCardState());
+                    handleOnChange(getCardState());
 
                     return;
                 }),
@@ -139,7 +140,8 @@ describe('AdyenV2PaymentStrategy', () => {
 
             adyenCardVerificationComponent = {
                 mount: jest.fn(() => {
-                    handleOnChange(getValidCardState());
+                    handleOnChange(getCardState());
+                    handleOnError(getCardState(false));
 
                     return;
                 }),
@@ -173,8 +175,9 @@ describe('AdyenV2PaymentStrategy', () => {
                     return adyenPaymentComponent;
                 }))
                 .mockImplementationOnce(jest.fn((_method, options) => {
-                    const { onChange } = options;
+                    const { onChange, onError } = options;
                     handleOnChange = onChange;
+                    handleOnError = onError;
 
                     return adyenCardVerificationComponent;
                 }));
@@ -394,6 +397,53 @@ describe('AdyenV2PaymentStrategy', () => {
 
             expect(adyenCheckout.create).toHaveBeenCalledTimes(2);
             expect(adyenCheckout.createFromAction).toHaveBeenCalledTimes(1);
+        });
+
+        it('Initiates ChallengeShopper but user cancels', async () => {
+            additionalActionComponent = {
+                mount: jest.fn(),
+                unmount: jest.fn(),
+            };
+
+            jest.spyOn(paymentActionCreator, 'submitPayment')
+                .mockReturnValueOnce(of(createErrorAction(PaymentActionType.SubmitPaymentFailed, challengeShopperError)));
+
+            const newOptions = {
+                methodId: 'adyenv2',
+                adyenv2: {
+                    containerId: 'adyen-scheme-component-field',
+                    cardVerificationContainerId: 'adyen-custom-card-component-field',
+                    threeDS2ContainerId: 'adyen-scheme-3ds-component-field',
+                    options: {
+                        hasHolderName: true,
+                        styles: {},
+                        placeholders: {},
+                    },
+                    threeDS2Options: {
+                        widgetSize: '05',
+                        onBeforeLoad: jest.fn(),
+                        onComplete: jest.fn(),
+                        onLoad: jest.fn(),
+                    },
+                    additionalActionOptions: {
+                        containerId: 'adyen-scheme-additional-action-component-field',
+                        onBeforeLoad: jest.fn(),
+                        onComplete: jest.fn(),
+                        onLoad: jest.fn(func => {
+                            func('Cancel');
+                        }),
+                    },
+                },
+            };
+
+            await strategy.initialize(newOptions);
+            try {
+                await strategy.execute(getOrderRequestBody());
+            } catch (error) {
+                expect(error).toBe('Close button clicked');
+                expect(paymentActionCreator.submitPayment).toHaveBeenCalledTimes(1);
+                expect(additionalActionComponent.unmount).toHaveBeenCalledTimes(1);
+            }
         });
     });
 

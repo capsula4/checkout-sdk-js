@@ -1,4 +1,4 @@
-export enum ActionType {
+export enum AdyenActionType {
     /*
     * The payment qualifies for 3D Secure 2, and will go through either the frictionless
     * or the challenge flow.
@@ -26,23 +26,23 @@ export enum ActionType {
     Voucher = 'voucher',
 }
 
-export enum ComponentType {
+export enum AdyenComponentType {
     ThreeDS2DeviceFingerprint = 'threeDS2DeviceFingerprint',
     ThreeDS2Challenge = 'threeDS2Challenge',
     SecuredFields = 'securedfields',
     IDEAL = 'ideal',
 }
 
-export enum HTTPMethod {
-    GET = 'GET',
-    POST = 'POST',
-}
-
-export enum PaymentMethodType {
+export enum AdyenPaymentMethodType {
     Scheme = 'scheme',
     BCMC = 'bcmc',
     IDEAL = 'ideal',
     Giropay = 'giropay',
+}
+
+export enum HTTPMethod {
+    GET = 'GET',
+    POST = 'POST',
 }
 
 export enum ResultCode {
@@ -58,12 +58,36 @@ export enum ResultCode {
     Refused = 'Refused',
 }
 
-export interface AdditionalAction {
+export interface AdyenAction {
+    method: HTTPMethod;
+
+    /**
+     * Value that you need to submit in your /payments/details request when handling
+     * the redirect.
+     */
+    paymentData: string;
+
+    paymentMethodType: AdyenPaymentMethodType;
+
+    /*
+     * The Component performs additional front-end actions depending on the action.type.
+     * Your next steps depend on the type of action that the Component performs.
+     */
+    type: AdyenActionType;
+
+    /**
+     * The HTTP request method that you should use. After the shopper completes the payment,
+     * they will be redirected back to your returnURL using the same method.
+     */
+    url: string;
+}
+
+export interface AdyenAdditionalAction {
     resultCode: ResultCode;
     action: string;
 }
 
-export interface AdditionalActionCallbacks {
+export interface AdyenAdditionalActionCallbacks {
     /**
      * A callback that gets called before adyen component is loaded
      */
@@ -81,15 +105,8 @@ export interface AdditionalActionCallbacks {
     onComplete?(): void;
 }
 
-export interface AdditionalActionOptions extends AdditionalActionCallbacks {
-    /**
-     * The location to insert the additional action component.
-     */
-    containerId: string;
-}
-
-export interface AdditionalActionErrorResponse {
-    provider_data: AdditionalAction;
+export interface AdyenAdditionalActionErrorResponse {
+    provider_data: AdyenAdditionalAction;
     errors: [
         {
             code: string;
@@ -97,33 +114,16 @@ export interface AdditionalActionErrorResponse {
     ];
 }
 
-export interface AdditionalActionState {
-    data: AdditionalAction;
-    isValid?: boolean;
+export interface AdyenAdditionalActionOptions extends AdyenAdditionalActionCallbacks {
+    /**
+     * The location to insert the additional action component.
+     */
+    containerId: string;
 }
 
-export interface AdyenAction {
-    method: HTTPMethod;
-
-    /**
-     * Value that you need to submit in your /payments/details request when handling
-     * the redirect.
-     */
-    paymentData: string;
-
-    paymentMethodType: PaymentMethodType;
-
-    /*
-     * The Component performs additional front-end actions depending on the action.type.
-     * Your next steps depend on the type of action that the Component performs.
-     */
-    type: ActionType;
-
-    /**
-     * The HTTP request method that you should use. After the shopper completes the payment,
-     * they will be redirected back to your returnURL using the same method.
-     */
-    url: string;
+export interface AdyenAdditionalActionState {
+    data: AdyenAdditionalAction;
+    isValid?: boolean;
 }
 
 interface CardDataPaymentMethodState {
@@ -137,6 +137,20 @@ interface CardPaymentMethodState {
     encryptedSecurityCode: string;
     holderName?: string;
     type: string;
+}
+
+export interface AdyenCardComponentEvents {
+    /**
+     * Called when the shopper enters data in the card input fields.
+     * Here you have the option to override your main Adyen Checkout configuration.
+     */
+    onChange?(state: CardState, component: AdyenComponent): void;
+
+    /**
+     * Called in case of an invalid card number, invalid expiry date, or
+     *  incomplete field. Called again when errors are cleared.
+     */
+    onError?(state: CardState, component: AdyenComponent): void;
 }
 
 export interface AdyenCheckout {
@@ -184,7 +198,7 @@ export interface AdyenConfiguration {
     onAdditionalDetails?(state: CardState, component?: AdyenComponent): void;
 }
 
-export interface AdyenCreditCardComponentOptions extends BaseCardComponentOptions, CardComponentEvents {
+export interface AdyenCreditCardComponentOptions extends AdyenBaseCardComponentOptions, AdyenCardComponentEvents {
     /**
      * Set an object containing the details array for type: scheme from
      * the /paymentMethods response.
@@ -225,7 +239,7 @@ export interface AdyenCreditCardComponentOptions extends BaseCardComponentOption
     placeholders?: CreditCardPlaceHolder | SepaPlaceHolder;
 }
 
-export interface AdyenCustomCardComponentOptions extends BaseCardComponentOptions, CardComponentEvents {
+export interface AdyenCustomCardComponentOptions extends AdyenBaseCardComponentOptions, AdyenCardComponentEvents {
     /**
      * Specify aria attributes for the input fields for web accessibility.
      */
@@ -305,6 +319,20 @@ export interface AdyenStoredPaymentMethod {
     type?: string;
 }
 
+export interface AdyenBaseCardComponentOptions {
+    /**
+     * Array of card brands that will be recognized by the component.
+     *
+     */
+    brands?: string[];
+
+    /**
+     * Set a style object to customize the input fields. See Styling Secured Fields
+     * for a list of supported properties.
+     */
+    styles?: StyleOptions;
+}
+
 export interface Bank {
     /**
      * The bank account number (without separators).
@@ -366,20 +394,6 @@ export interface Bank {
     taxId?: string;
 }
 
-export interface BaseCardComponentOptions {
-    /**
-     * Array of card brands that will be recognized by the component.
-     *
-     */
-    brands?: string[];
-
-    /**
-     * Set a style object to customize the input fields. See Styling Secured Fields
-     * for a list of supported properties.
-     */
-    styles?: StyleOptions;
-}
-
 export interface Card {
     /**
      * The card verification code (1-20 characters). Depending on the card brand, it
@@ -435,14 +449,6 @@ export interface Card {
 export interface CardState {
     data: CardDataPaymentMethodState;
     isValid?: boolean;
-}
-
-export interface CardComponentEvents {
-    /**
-     * Called when the shopper enters data in the card input fields.
-     * Here you have the option to override your main Adyen Checkout configuration.
-     */
-    onChange?(state: CardState, component: AdyenComponent): void;
 }
 
 export interface CreditCardPlaceHolder {
@@ -738,16 +744,16 @@ export interface SubInputDetail {
 
 export interface ThreeDS2ChallengeComponentOptions {
     size?: string;
-    onAdditionalDetails?(state: AdditionalActionState, component?: AdyenComponent): void;
+    onAdditionalDetails?(state: AdyenAdditionalActionState, component?: AdyenComponent): void;
     onError(error: AdyenError): void;
 }
 
 export interface ThreeDS2DeviceFingerprintComponentOptions {
-    onAdditionalDetails?(state: AdditionalActionState, component?: AdyenComponent): void;
+    onAdditionalDetails?(state: AdyenAdditionalActionState, component?: AdyenComponent): void;
     onError(error: AdyenError): void;
 }
 
-export interface ThreeDS2Options extends AdditionalActionCallbacks {
+export interface ThreeDS2Options extends AdyenAdditionalActionCallbacks {
     /**
      * Specify Three3DS2Challenge Widget Size
      *
@@ -761,6 +767,6 @@ export interface ThreeDS2Options extends AdditionalActionCallbacks {
     widgetSize?: string;
 }
 
-export type ComponentState = (
+export type AdyenComponentState = (
     CardState
 );

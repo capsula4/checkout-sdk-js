@@ -5,9 +5,9 @@ import Payment from '../../payment';
 import { PaymentInitializeOptions } from '../../payment-request-options';
 import { getCreditCardInstrument, getErrorPaymentResponseBody, getVaultedInstrument } from '../../payments.mock';
 
-import { AdditionalActionErrorResponse, AdyenCheckout, AdyenConfiguration, AdyenError, ComponentState, PaymentMethodType, ResultCode } from './adyenv2';
+import { AdyenAdditionalActionErrorResponse, AdyenCheckout, AdyenComponentState, AdyenConfiguration, AdyenError, AdyenPaymentMethodType, ResultCode } from './adyenv2';
 
-function getAdditionalActionErrorResponse(resultCode: ResultCode): AdditionalActionErrorResponse {
+function getAdditionalActionErrorResponse(resultCode: ResultCode): AdyenAdditionalActionErrorResponse {
     return {
         provider_data: {
             resultCode,
@@ -21,21 +21,7 @@ function getAdditionalActionErrorResponse(resultCode: ResultCode): AdditionalAct
     };
 }
 
-function getCardState() {
-    return {
-        data: {
-            paymentMethod: {
-                encryptedCardNumber: 'CARD_NUMBER',
-                encryptedExpiryMonth: 'EXPIRY_MONTH',
-                encryptedExpiryYear: 'EXPIRY_YEAR',
-                encryptedSecurityCode: 'CVV',
-                type: PaymentMethodType.Scheme,
-            },
-        },
-    };
-}
-
-function getPayment(paymentMethodType: PaymentMethodType): Payment {
+function getPayment(paymentMethodType: AdyenPaymentMethodType): Payment {
     return {
         methodId: paymentMethodType,
         paymentData: getCreditCardInstrument(),
@@ -52,7 +38,7 @@ function getUnknownErrorResponse(): any {
     };
 }
 
-function getVaultedPayment(paymentMethodType: PaymentMethodType): Payment {
+function getVaultedPayment(paymentMethodType: AdyenPaymentMethodType): Payment {
     return {
         methodId: paymentMethodType,
         paymentData: getVaultedInstrument(),
@@ -175,14 +161,14 @@ export function getInitializeOptionsWithUndefinedWidgetSize(): PaymentInitialize
     };
 }
 
-export function getOrderRequestBody(paymentMethodType: PaymentMethodType = PaymentMethodType.Scheme): OrderRequestBody {
+export function getOrderRequestBody(paymentMethodType: AdyenPaymentMethodType = AdyenPaymentMethodType.Scheme): OrderRequestBody {
     return {
         useStoreCredit: false,
         payment: getPayment(paymentMethodType) as OrderPaymentRequestBody,
     };
 }
 
-export function getOrderRequestBodyWithVaultedInstrument(paymentMethodType: PaymentMethodType = PaymentMethodType.Scheme): OrderRequestBody {
+export function getOrderRequestBodyWithVaultedInstrument(paymentMethodType: AdyenPaymentMethodType = AdyenPaymentMethodType.Scheme): OrderRequestBody {
     return {
         useStoreCredit: false,
         payment: getVaultedPayment(paymentMethodType) as OrderPaymentRequestBody,
@@ -203,9 +189,17 @@ export function getUnknownError(): RequestError {
     }));
 }
 
-export function getValidCardState(): ComponentState {
+export function getCardState(isValid: boolean = true): AdyenComponentState {
     return {
-        ...getCardState(),
-        isValid: true,
+        data: {
+            paymentMethod: {
+                encryptedCardNumber: 'CARD_NUMBER',
+                encryptedExpiryMonth: 'EXPIRY_MONTH',
+                encryptedExpiryYear: 'EXPIRY_YEAR',
+                encryptedSecurityCode: 'CVV',
+                type: AdyenPaymentMethodType.Scheme,
+            },
+        },
+        isValid,
     };
 }
