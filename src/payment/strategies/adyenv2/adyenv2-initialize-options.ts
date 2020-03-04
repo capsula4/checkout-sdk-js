@@ -1,6 +1,6 @@
 import { Omit } from '../../../common/types';
 
-import { AdyenAdditionalActionOptions, AdyenCreditCardComponentOptions, AdyenIdealComponentOptions, ThreeDS2Options } from './adyenv2';
+import { AdyenAdditionalActionOptions, AdyenCreditCardComponentOptions, AdyenIdealComponentOptions, AdyenThreeDS2Options } from './adyenv2';
 
 /**
  * A set of options that are required to initialize the AdyenV2 payment method.
@@ -30,7 +30,7 @@ export default interface AdyenV2PaymentInitializeOptions {
      * @deprecated
      * Use additionalActionOptions instead as this property will be removed in the future
      */
-    threeDS2Options: ThreeDS2Options;
+    threeDS2Options: AdyenThreeDS2Options;
 
     /**
      * A set of options that are required to initialize additional payment actions.

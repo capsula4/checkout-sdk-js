@@ -5,14 +5,14 @@ import { getBrowserInfo } from '../../../common/browser-info';
 import { InvalidArgumentError, MissingDataError, MissingDataErrorType, NotInitializedError, NotInitializedErrorType, RequestError } from '../../../common/error/errors';
 import { OrderActionCreator, OrderRequestBody } from '../../../order';
 import { OrderFinalizationNotRequiredError } from '../../../order/errors';
-import { PaymentArgumentInvalidError } from '../../errors';
+import { PaymentArgumentInvalidError, PaymentMethodCancelledError } from '../../errors';
 import isVaultedInstrument from '../../is-vaulted-instrument';
 import Payment, { HostedInstrument } from '../../payment';
 import PaymentActionCreator from '../../payment-action-creator';
 import { PaymentInitializeOptions, PaymentRequestOptions } from '../../payment-request-options';
 import PaymentStrategy from '../payment-strategy';
 
-import { AdyenAction, AdyenActionType, AdyenAdditionalAction, AdyenAdditionalActionState, AdyenCheckout, AdyenComponent, AdyenComponentState, AdyenComponentType, AdyenConfiguration, AdyenError } from './adyenv2';
+import isCardState, { AdyenAction, AdyenActionType, AdyenAdditionalAction, AdyenAdditionalActionState, AdyenCheckout, AdyenComponent, AdyenComponentState, AdyenComponentType, AdyenConfiguration, AdyenError, AdyenPaymentMethodType } from './adyenv2';
 import AdyenV2PaymentInitializeOptions from './adyenv2-initialize-options';
 import AdyenV2ScriptLoader from './adyenv2-script-loader';
 
@@ -53,41 +53,13 @@ export default class AdyenV2PaymentStrategy implements PaymentStrategy {
             paymentMethodsResponse: paymentMethod.initializationData.paymentMethodsResponse,
         };
 
-        return this._scriptLoader.load(configuration)
+        this._scriptLoader.load(configuration)
             .then(adyenCheckout => {
                 this._adyenCheckout = adyenCheckout;
-
-                const paymentComponent = this._adyenCheckout.create(
-                    paymentMethod.method,
-                    {
-                        ...adyenv2.options,
-                        onChange: (componentState: AdyenComponentState) => {
-                            this._updateComponentState(componentState);
-                        },
-                    }
-                );
-
-                paymentComponent.mount(`#${adyenv2.containerId}`);
-
-                this._paymentComponent = paymentComponent;
-
-                if (adyenv2.cardVerificationContainerId) {
-                    const cardVerificationComponent = this._adyenCheckout.create(AdyenComponentType.SecuredFields, {
-                        onChange: (componentState: AdyenComponentState) => {
-                            this._updateComponentState(componentState);
-                        },
-                        onError: (componentState: AdyenComponentState) => {
-                            this._updateComponentState(componentState);
-                        },
-                    });
-
-                    cardVerificationComponent.mount(`#${adyenv2.cardVerificationContainerId}`);
-
-                    this._cardVerificationComponent = cardVerificationComponent;
-                }
-
-                return Promise.resolve(this._store.getState());
+                this._mountComponent(paymentMethod.method);
             });
+
+        return Promise.resolve(this._store.getState());
     }
 
     execute(payload: OrderRequestBody, options?: PaymentRequestOptions): Promise<InternalCheckoutSelectors> {
@@ -106,8 +78,8 @@ export default class AdyenV2PaymentStrategy implements PaymentStrategy {
                 if (!componentState) {
                     throw new NotInitializedError(NotInitializedErrorType.PaymentNotInitialized);
                 }
-                if (paymentData && isVaultedInstrument(paymentData)) {
 
+                if (paymentData && isVaultedInstrument(paymentData) && isCardState(componentState)) {
                     const { encryptedCardNumber, encryptedSecurityCode } = componentState.data.paymentMethod;
 
                     return this._store.dispatch(this._paymentActionCreator.submitPayment({
@@ -143,8 +115,7 @@ export default class AdyenV2PaymentStrategy implements PaymentStrategy {
 
                 return this._store.dispatch(this._paymentActionCreator.submitPayment(paymentPayload));
             })
-            .catch(error => this._processPayment(error, shouldSaveInstrument))
-            .catch(error => this._processPayment(error, shouldSaveInstrument));
+            .catch(error => this._processAdditionalAction(error, shouldSaveInstrument));
     }
 
     finalize(): Promise<InternalCheckoutSelectors> {
@@ -165,6 +136,14 @@ export default class AdyenV2PaymentStrategy implements PaymentStrategy {
         return Promise.resolve(this._store.getState());
     }
 
+    private _getAdyenCheckout(): AdyenCheckout {
+        if (!this._adyenCheckout) {
+            throw new NotInitializedError(NotInitializedErrorType.PaymentNotInitialized);
+        }
+
+        return this._adyenCheckout;
+    }
+
     private _getAdyenV2PaymentInitializeOptions(): AdyenV2PaymentInitializeOptions {
         if (!this._adyenv2) {
             throw new InvalidArgumentError('"options.adyenv2" argument was not provided during initialization.');
@@ -183,33 +162,13 @@ export default class AdyenV2PaymentStrategy implements PaymentStrategy {
         return widgetSize;
     }
 
-    private async _processPayment(error: any, shouldSaveInstrument?: boolean): Promise<any> {
-        if (!(error instanceof RequestError) || !some(error.body.errors, { code: 'additional_action_required' })) {
-            return Promise.reject(error);
-        }
-
-        const payment = await this._handleFromAction(error.body.provider_data);
-
-        return await this._store.dispatch(this._paymentActionCreator.submitPayment({
-            ...payment,
-            paymentData: {
-                ...payment.paymentData,
-                shouldSaveInstrument,
-            },
-        }));
-    }
-
-    private _handleFromAction(additionalAction: AdyenAdditionalAction): Promise<Payment> {
+    private _handleAction(additionalAction: AdyenAdditionalAction): Promise<Payment> {
         return new Promise((resolve, reject) => {
-            if (!this._adyenCheckout) {
-                throw new NotInitializedError(NotInitializedErrorType.PaymentNotInitialized);
-            }
-
             const { threeDS2ContainerId, additionalActionOptions } = this._getAdyenV2PaymentInitializeOptions();
             const { onBeforeLoad, containerId, onLoad, onComplete } = additionalActionOptions;
             const adyenAction: AdyenAction = JSON.parse(additionalAction.action);
 
-            const additionalActionComponent = this._adyenCheckout.createFromAction(adyenAction, {
+            const additionalActionComponent = this._getAdyenCheckout().createFromAction(adyenAction, {
                 onAdditionalDetails: (additionalActionState: AdyenAdditionalActionState) => {
                     const paymentPayload = {
                         methodId: adyenAction.paymentMethodType,
@@ -229,18 +188,82 @@ export default class AdyenV2PaymentStrategy implements PaymentStrategy {
             });
 
             if (onBeforeLoad) {
-                onBeforeLoad(adyenAction.type === AdyenActionType.ThreeDS2Challenge);
+                onBeforeLoad(adyenAction.type === AdyenActionType.ThreeDS2Challenge ||
+                    adyenAction.type === AdyenActionType.QRCode);
             }
 
             additionalActionComponent.mount(`#${containerId || threeDS2ContainerId}`);
 
             if (onLoad) {
                 onLoad(() => {
-                    reject('Close button clicked');
+                    reject(new PaymentMethodCancelledError());
                     additionalActionComponent.unmount();
                 });
             }
         });
+    }
+
+    private _mountComponent(paymentMethodName: string): void {
+        const adyenv2 = this._getAdyenV2PaymentInitializeOptions();
+        const adyenCheckout = this._getAdyenCheckout();
+
+        switch (paymentMethodName) {
+            case AdyenPaymentMethodType.CreditCard:
+            case AdyenPaymentMethodType.Bancontact:
+            case AdyenPaymentMethodType.GiroPay:
+            case AdyenPaymentMethodType.iDEAL:
+            case AdyenPaymentMethodType.SEPA:
+                const paymentComponent = adyenCheckout.create(paymentMethodName, {
+                        ...adyenv2.options,
+                        onChange: componentState => this._updateComponentState(componentState),
+                    }
+                );
+
+                paymentComponent.mount(`#${adyenv2.containerId}`);
+
+                this._paymentComponent = paymentComponent;
+
+                if (adyenv2.cardVerificationContainerId) {
+                    const cardVerificationComponent = adyenCheckout.create(AdyenComponentType.SecuredFields, {
+                        ...adyenv2.options,
+                        onChange: componentState => this._updateComponentState(componentState),
+                        onError: componentState => this._updateComponentState(componentState),
+                    });
+
+                    cardVerificationComponent.mount(`#${adyenv2.cardVerificationContainerId}`);
+
+                    this._cardVerificationComponent = cardVerificationComponent;
+                }
+                break;
+
+            case AdyenPaymentMethodType.AliPay:
+            case AdyenPaymentMethodType.Sofort:
+            case AdyenPaymentMethodType.WeChatPayQR:
+                this._updateComponentState({
+                    data: {
+                        paymentMethod: {
+                            type: paymentMethodName,
+                        },
+                    },
+                });
+        }
+    }
+
+    private async _processAdditionalAction(error: any, shouldSaveInstrument?: boolean): Promise<any> {
+        if (!(error instanceof RequestError) || !some(error.body.errors, {code: 'additional_action_required'})) {
+            return Promise.reject(error);
+        }
+
+        const payment = await this._handleAction(error.body.provider_data);
+
+        return await this._store.dispatch(this._paymentActionCreator.submitPayment({
+            ...payment,
+            paymentData: {
+                ...payment.paymentData,
+                shouldSaveInstrument,
+            },
+        }))
+            .catch(error => this._processAdditionalAction(error, shouldSaveInstrument));
     }
 
     private _updateComponentState(componentState: AdyenComponentState) {
