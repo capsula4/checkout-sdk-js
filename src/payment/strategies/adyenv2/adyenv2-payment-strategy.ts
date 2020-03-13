@@ -253,17 +253,18 @@ export default class AdyenV2PaymentStrategy implements PaymentStrategy {
         if (!(error instanceof RequestError) || !some(error.body.errors, {code: 'additional_action_required'})) {
             return Promise.reject(error);
         }
-
         const payment = await this._handleAction(error.body.provider_data);
-
-        return await this._store.dispatch(this._paymentActionCreator.submitPayment({
-            ...payment,
-            paymentData: {
-                ...payment.paymentData,
-                shouldSaveInstrument,
-            },
-        }))
-            .catch(error => this._processAdditionalAction(error, shouldSaveInstrument));
+        try {
+            return await this._store.dispatch(this._paymentActionCreator.submitPayment({
+                ...payment,
+                paymentData: {
+                    ...payment.paymentData,
+                    shouldSaveInstrument,
+                },
+            }));
+        } catch (error) {
+            return this._processAdditionalAction(error, shouldSaveInstrument);
+        }
     }
 
     private _updateComponentState(componentState: AdyenComponentState) {
