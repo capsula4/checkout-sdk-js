@@ -213,14 +213,8 @@ describe('AdyenV2PaymentStrategy', () => {
 
                 await strategy.initialize(options);
 
-                expect( () =>  strategy.execute(getOrderRequestBody()))
-                    .toThrow(NotInitializedError);
-
-                try {
-                    await strategy.execute(getOrderRequestBody());
-                } catch (error) {
-                    expect(error).toBeInstanceOf(NotInitializedError);
-                }
+                await expect(strategy.execute(getOrderRequestBody()))
+                    .rejects.toThrow(NotInitializedError);
 
                 expect(paymentActionCreator.submitPayment).toHaveBeenCalledTimes(0);
                 expect(adyenCheckout.create).toHaveBeenCalledTimes(2);
@@ -248,20 +242,22 @@ describe('AdyenV2PaymentStrategy', () => {
                                 language: 'en-US',
                                 screen_height: 0,
                                 screen_width: 0,
-                                time_zone_offset: '360',
+                                time_zone_offset: expect.anything(),
                             },
                         },
-                    }}));
+                    },
+                }));
                 expect(adyenCheckout.create).toHaveBeenCalledTimes(2);
             });
 
             it('additional action component fires back onError', async () => {
                 let additionalActionComponentWithError: AdyenComponent;
+                const adyenError = getAdyenError();
                 let handleOnError: (error: AdyenError) => {};
 
                 additionalActionComponentWithError = {
                     mount: jest.fn(() => {
-                        handleOnError(getAdyenError());
+                        handleOnError(adyenError);
 
                         return;
                     }),
@@ -279,9 +275,8 @@ describe('AdyenV2PaymentStrategy', () => {
                     .mockReturnValueOnce(of(createErrorAction(PaymentActionType.SubmitPaymentFailed, identifyShopperError)));
 
                 await strategy.initialize(options);
-
-                expect(async () => await strategy.execute(getOrderRequestBody()))
-                    .toThrowError('MESSAGE');
+                await expect(strategy.execute(getOrderRequestBody()))
+                    .rejects.toMatchObject(adyenError);
 
                 expect(paymentActionCreator.submitPayment).toHaveBeenCalledTimes(1);
                 expect(adyenCheckout.create).toHaveBeenCalledTimes(2);
@@ -355,8 +350,8 @@ describe('AdyenV2PaymentStrategy', () => {
 
                 await strategy.initialize(newOptions);
 
-                expect(async () => await strategy.execute(getOrderRequestBody()))
-                    .toThrowError(PaymentMethodCancelledError);
+                await expect(strategy.execute(getOrderRequestBody()))
+                    .rejects.toThrowError(PaymentMethodCancelledError);
                 expect(paymentActionCreator.submitPayment).toHaveBeenCalledTimes(1);
                 expect(additionalActionComponent.unmount).toHaveBeenCalledTimes(1);
             });
@@ -379,13 +374,13 @@ describe('AdyenV2PaymentStrategy', () => {
                     expect(adyenCheckout.createFromAction).toHaveBeenCalledTimes(1);
                 });
 
-                it('returns UNKNOWN_ERROR when submitPayment fails', () => {
+                it('returns UNKNOWN_ERROR when submitPayment fails', async () => {
                     jest.spyOn(paymentActionCreator, 'submitPayment')
                         .mockReturnValueOnce(of(createErrorAction(PaymentActionType.SubmitPaymentFailed, getUnknownError())))
                         .mockReturnValueOnce(submitPaymentAction);
 
-                    expect(async () => await strategy.execute(getOrderRequestBody()))
-                        .toThrowError(RequestError);
+                    await expect(strategy.execute(getOrderRequestBody()))
+                        .rejects.toThrow(RequestError);
 
                     expect(paymentActionCreator.submitPayment).toHaveBeenCalledTimes(2);
                     expect(adyenCheckout.create).toHaveBeenCalledTimes(2);
@@ -409,12 +404,12 @@ describe('AdyenV2PaymentStrategy', () => {
                         expect(adyenCheckout.createFromAction).toHaveBeenCalledTimes(2);
                     });
 
-                    it('returns UNKNOWN_ERROR when submitPayment fails',    () => {
+                    it('returns UNKNOWN_ERROR when submitPayment fails', async () => {
                         jest.spyOn(paymentActionCreator, 'submitPayment')
                             .mockReturnValueOnce(of(createErrorAction(PaymentActionType.SubmitPaymentFailed, getUnknownError())));
 
-                        expect(async () => await strategy.execute(getOrderRequestBody()))
-                            .toThrowError(RequestError);
+                        await expect(strategy.execute(getOrderRequestBody()))
+                            .rejects.toThrowError(RequestError);
 
                         expect(paymentActionCreator.submitPayment).toHaveBeenCalledTimes(3);
                         expect(adyenCheckout.create).toHaveBeenCalledTimes(2);
@@ -441,13 +436,13 @@ describe('AdyenV2PaymentStrategy', () => {
                     expect(adyenCheckout.createFromAction).toHaveBeenCalledTimes(1);
                 });
 
-                it('returns UNKNOWN_ERROR when submitPayment fails', () => {
+                it('returns UNKNOWN_ERROR when submitPayment fails', async () => {
                     jest.spyOn(paymentActionCreator, 'submitPayment')
                         .mockReturnValueOnce(of(createErrorAction(PaymentActionType.SubmitPaymentFailed, getUnknownError())))
                         .mockReturnValueOnce(submitPaymentAction);
 
-                    expect(async () => await strategy.execute(getOrderRequestBody()))
-                        .toThrowError(RequestError);
+                    await expect(strategy.execute(getOrderRequestBody()))
+                        .rejects.toThrowError(RequestError);
 
                     expect(paymentActionCreator.submitPayment).toHaveBeenCalledTimes(2);
                     expect(adyenCheckout.create).toHaveBeenCalledTimes(2);
