@@ -293,9 +293,6 @@ declare interface PaypalButtonStyleOptions {
     fundingicons?: boolean;
 }
 
-/**
- * A set of options for configuring an asynchronous request.
- */
 declare interface RequestOptions<TParams = {}> {
     /**
      * Provide this option if you want to cancel or time out the request. If the
